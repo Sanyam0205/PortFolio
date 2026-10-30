@@ -175,9 +175,14 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   background: transparent;
   font: inherit;
   font-size: 15px;
+  text-overflow: ellipsis;
   color: var(--ink);
 }
 .ask input::placeholder { color: var(--muted); }
+/* Under 16px, iOS zooms the whole page when the input takes focus. */
+@media (max-width: 980px), (pointer: coarse) {
+  .ask input { font-size: 16px; }
+}
 .ask input:focus, .ask input:focus-visible { outline: none; border-bottom: 2px solid var(--maroon); }
 .ask button {
   flex: none;
@@ -625,6 +630,17 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   .guide[data-compact="true"] .guide-open { display: inline-flex; }
   html:has(.guide[data-compact="true"]) .sign { display: none; }
   html:has(.guide[data-compact="true"]) .mark { width: 22px; height: 22px; }
+  /* Typing: everything fits above the keyboard, without moving the page beneath the panel. */
+  .guide[data-typing="true"] {
+    --typing-panel: min(calc(var(--typing-h, 100vh) - var(--header)), var(--panel-h));
+    height: var(--typing-panel);
+    margin-bottom: calc(var(--panel-h) - var(--typing-panel));
+    padding-bottom: 4px;
+  }
+  .guide[data-typing="true"] .options { display: none; }
+  .guide[data-typing="true"] .bubble { min-height: 0; padding: 8px 12px; }
+  .guide[data-typing="true"] .speech-text { min-height: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  html:has(.guide[data-typing="true"]) .sign { display: none; }
   /* Section tabs sit in the header, clear of the host's badge in the bottom corner. */
   .top { flex-wrap: wrap; align-content: flex-start; gap: 0 16px; }
   .brand, .top-right { height: 62px; }

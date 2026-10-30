@@ -8,7 +8,7 @@ import { answer, type Action } from "@/lib/assistant";
 
 const Stage = dynamic(() => import("./Stage"), { ssr: false });
 
-const GREETING = "Hi! I'm the soft version of Sanyam. Scroll and I'll walk you through my work.";
+const GREETING = "Hi! I'm the soft version of Sanyam. Scroll and I'll walk you through my work. Orrr you can drag and drop me anywhere for a fun experience!!";
 const SECTIONS: { id: Zone; label: string }[] = [
   { id: "about", label: "About" },
   { id: "work", label: "Work" },
@@ -176,6 +176,7 @@ export default function Portfolio() {
   const [copied, setCopied] = useState(false);
   const [compact, setCompact] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [typing, setTyping] = useState(false);
 
   const slot = useRef<HTMLDivElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
@@ -193,6 +194,8 @@ export default function Portfolio() {
   const doorTimer = useRef(0);
   const compactRef = useRef(false);
   const guideOpenedAt = useRef(0);
+  const typingRef = useRef(false);
+  const askInput = useRef<HTMLInputElement>(null);
   // Focus is only moved for keyboard users. After a click or tap, pressing an arrow
   // key would otherwise draw a focus ring around whatever was last pressed.
   const usingPointer = useRef(true);
@@ -275,7 +278,8 @@ export default function Portfolio() {
       const y = window.scrollY;
       const phone = window.innerWidth <= 980;
       setCompact((c) => (phone ? (c ? y > 8 : y > 48) : false));
-      if (Math.abs(y - guideOpenedAt.current) > 60) setGuideOpen(false);
+      // The keyboard scrolls the page too. Folding the guide then would hide the input and close the keyboard.
+      if (!typingRef.current && Math.abs(y - guideOpenedAt.current) > 60) setGuideOpen(false);
       attend();
     };
     onScroll();
@@ -299,6 +303,29 @@ export default function Portfolio() {
       window.removeEventListener("resize", onScroll);
     };
   }, [avatar]);
+
+  // While typing on a phone, the panel fits the space above the keyboard and the page stays where it was.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!typing || !viewport) return;
+    const y = window.scrollY;
+    let settle = 0;
+    const fit = () => {
+      document.documentElement.style.setProperty("--typing-h", `${Math.round(viewport.height)}px`);
+      window.scrollTo({ top: y, behavior: "instant" });
+    };
+    const onResize = () => {
+      fit();
+      window.clearTimeout(settle);
+      settle = window.setTimeout(fit, 350);
+    };
+    viewport.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(settle);
+      viewport.removeEventListener("resize", onResize);
+      document.documentElement.style.removeProperty("--typing-h");
+    };
+  }, [typing]);
 
   const scrollTo = useCallback((el: HTMLElement | null) => {
     avatar.navigate();
@@ -515,7 +542,7 @@ export default function Portfolio() {
       </header>
 
       <div className="split">
-        <aside className="guide" data-compact={compact && !guideOpen} aria-label="Sanyam, your guide">
+        <aside className="guide" data-compact={compact && !guideOpen} data-typing={typing} aria-label="Sanyam, your guide">
           <div className="stage-slot" ref={slot} />
           <div className="bubble" ref={bubble}>
             <Speech text={speech} />
@@ -541,20 +568,35 @@ export default function Portfolio() {
                 if (!q) return;
                 setInput("");
                 respond(q);
+                // On a phone the keyboard would cover him while he answers.
+                if (window.innerWidth <= 980) askInput.current?.blur();
               }}
             >
               <label htmlFor="ask" className="sr-only">Ask Sanyam a question</label>
               <input
+                ref={askInput}
                 id="ask"
                 type="text"
                 autoComplete="off"
+                enterKeyHint="send"
                 value={input}
                 placeholder="Ask about my projects, skills or availability"
                 onChange={(e) => setInput(e.target.value)}
-                onFocus={() => avatar.setTyping(true)}
-                onBlur={() => avatar.setTyping(false)}
+                onFocus={() => {
+                  avatar.setTyping(true);
+                  typingRef.current = true;
+                  setTyping(true);
+                  if (window.innerWidth <= 980) setGuideOpen(true);
+                }}
+                onBlur={() => {
+                  avatar.setTyping(false);
+                  typingRef.current = false;
+                  guideOpenedAt.current = window.scrollY;
+                  setTyping(false);
+                }}
               />
-              <button type="submit" aria-label="Ask">
+              {/* Keep focus in the input, or the panel resizes under the finger before the tap lands. */}
+              <button type="submit" aria-label="Ask" onPointerDown={(e) => e.preventDefault()}>
                 <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
                   <path d="M2 7h10M8 3l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" />
                 </svg>

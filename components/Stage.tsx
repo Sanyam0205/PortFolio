@@ -16,6 +16,7 @@ type StageProps = {
   doorOpen: boolean;
   onSign: (id: Zone) => void;
   onNoWebgl: () => void;
+  onFigureTap: () => void;
 };
 
 function Scene({ avatar, slot, bubble, hit, mark, signRefs, signs }: {
@@ -213,7 +214,7 @@ function StaticFigure() {
   );
 }
 
-export default function Stage({ avatar, slot, bubble, signs, zone, doorOpen, onSign, onNoWebgl }: StageProps) {
+export default function Stage({ avatar, slot, bubble, signs, zone, doorOpen, onSign, onNoWebgl, onFigureTap }: StageProps) {
   const hit = useRef<HTMLButtonElement>(null);
   const mark = useRef<HTMLDivElement>(null);
   const signRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -280,7 +281,7 @@ export default function Stage({ avatar, slot, bubble, signs, zone, doorOpen, onS
         }}
         onPointerMove={(e) => {
           const d = drag.current;
-          if (d.id !== e.pointerId || e.pointerType === "touch") return;
+          if (d.id !== e.pointerId) return;
           if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) {
             d.moved = true;
             avatar.startDrag(d.x, d.y);
@@ -290,7 +291,13 @@ export default function Stage({ avatar, slot, bubble, signs, zone, doorOpen, onS
         onPointerUp={(e) => {
           const d = drag.current;
           if (d.id !== e.pointerId) return;
-          if (d.moved) avatar.endDrag(); else avatar.poke();
+          if (d.moved) {
+            avatar.endDrag();
+          } else {
+            avatar.poke();
+            onFigureTap();
+            if (e.pointerType === "touch") navigator.vibrate?.(12);
+          }
           drag.current.id = -1;
           delete e.currentTarget.dataset.grabbing;
         }}

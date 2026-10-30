@@ -120,6 +120,8 @@ export class Avatar {
   private zone: Zone | null = null;
   private knots: { sy: number; s: number }[] = [{ sy: 0, s: 0 }, { sy: 1000, s: 2 }, { sy: 2000, s: 4 }, { sy: 3000, s: 6 }];
   private signsKey = "";
+  private tight = false;
+  private gaze: { x: number; y: number } | null = null;
 
   constructor(events: AvatarEvents) {
     this.events = events;
@@ -131,7 +133,9 @@ export class Avatar {
     // The stage can pass through zero height while the phone guide folds.
     if (rect.w < 8 || rect.h < 8) return;
     this.stage = rect;
-    this.scale = Math.min((rect.h * 0.62) / 1.5, rect.w / 2.5);
+    // In the phone's reading strip he's cropped closer so he stays a character, not a speck.
+    this.tight = rect.w < 140;
+    this.scale = this.tight ? Math.min((rect.h * 0.66) / 1.5, rect.w / 2) : Math.min((rect.h * 0.62) / 1.5, rect.w / 2.5);
   }
 
   /** Maps scroll position to stair progress so each section top lands on a landing. */
@@ -254,6 +258,11 @@ export class Avatar {
     }
     this.hoverPx = px;
     if (px) this.wake();
+  }
+
+  /** Touch screens have no cursor, so he looks at whatever the visitor is reading. */
+  setGaze(px: { x: number; y: number } | null) {
+    this.gaze = px;
   }
 
   setTyping(on: boolean) {
@@ -450,7 +459,7 @@ export class Avatar {
     // stage instead of being pinned to one spot, and stairs always show below him.
     const hs = this.stage.h / this.scale;
     const firstFrame = t <= dt + 1e-6;
-    const camTarget = firstFrame ? path.y + 0.2 * hs : clamp(this.camY, path.y + 0.12 * hs, path.y + 0.26 * hs);
+    const camTarget = firstFrame ? path.y + 0.2 * hs : clamp(this.camY, path.y + (this.tight ? 0.3 : 0.12) * hs, path.y + (this.tight ? 0.36 : 0.26) * hs);
     this.camY = firstFrame ? camTarget : this.camY + (camTarget - this.camY) * E(7);
 
     // Pointer tracking.
@@ -458,7 +467,8 @@ export class Avatar {
     p.sx += (p.x - p.sx) * E(5);
     p.sy += (p.y - p.sy) * E(5);
     const head = this.worldToPx(this.x, this.y + HEAD_Y);
-    const lookPx = hover ?? (pointerSeen ? { x: p.sx, y: p.sy } : null);
+    const gazing = this.gaze && t - p.movedAt > 2.5;
+    const lookPx = hover ?? (gazing ? this.gaze : pointerSeen ? { x: p.sx, y: p.sy } : null);
     const talking = t < this.talkUntil;
     let lookX = 0.2;
     let lookY = 0.03;

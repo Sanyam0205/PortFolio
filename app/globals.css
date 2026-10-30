@@ -206,10 +206,24 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   background: transparent;
   cursor: grab;
   border-radius: 40%;
-  touch-action: pan-y;
+  touch-action: none;
 }
 .figure-hit[data-grabbing] { cursor: grabbing; }
-@media (pointer: fine) { .figure-hit { touch-action: none; } }
+/* Keyboard users get a label, not a ring around his invisible grab area. */
+.figure-hit:focus-visible { outline: none; }
+.figure-hit:focus-visible::after {
+  content: "Press Enter to say hi";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--maroon);
+  color: #ffffff;
+  font: 500 13px/1.3 var(--font-sans), sans-serif;
+  white-space: nowrap;
+}
 
 .sign {
   position: fixed;
@@ -504,7 +518,7 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   top: var(--header);
   bottom: 0;
   z-index: 1;
-  padding: 16px 40px 28px 48px;
+  padding: 16px 40px 76px 48px;
   background: #ffffff;
   display: flex;
   flex-direction: column;
@@ -578,13 +592,13 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
 
 /* Small screens: the guide rides at the top, the information scrolls beneath */
 @media (max-width: 980px) {
-  :root { --header: 64px; --panel-h: 420px; --strip-h: 96px; }
+  :root { --header: 108px; --panel-h: 400px; --strip-h: 112px; }
   .top { padding: 0 16px; }
   .top-nav { display: none; }
   .resume { padding: 0 14px; }
   .split { grid-template-columns: minmax(0, 1fr); }
   html { overflow-anchor: none; }
-  body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+  body { padding-bottom: 92px; }
   .options { gap: 0 10px; }
   .option { font-size: 13px; }
   .guide {
@@ -603,7 +617,7 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
     padding: 4px 12px;
     border-bottom: 1px solid var(--line);
   }
-  .guide[data-compact="true"] .stage-slot { flex: none; width: 80px; height: 88px; margin: 0; }
+  .guide[data-compact="true"] .stage-slot { flex: none; width: 92px; height: 104px; margin: 0; }
   .guide[data-compact="true"] .bubble { order: 0; flex: 1; min-width: 0; min-height: 0; padding: 8px 12px; font-size: 13px; line-height: 1.3; }
   .guide[data-compact="true"] .bubble::after { display: none; }
   .guide[data-compact="true"] .speech-text { min-height: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
@@ -611,19 +625,11 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   .guide[data-compact="true"] .guide-open { display: inline-flex; }
   html:has(.guide[data-compact="true"]) .sign { display: none; }
   html:has(.guide[data-compact="true"]) .mark { width: 22px; height: 22px; }
-  .tabs {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 7;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding-bottom: env(safe-area-inset-bottom);
-    background: #ffffff;
-    border-top: 1px solid var(--line);
-  }
-  .tabs a { min-height: 56px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--ink-2); text-decoration: none; }
+  /* Section tabs sit in the header, clear of the host's badge in the bottom corner. */
+  .top { flex-wrap: wrap; align-content: flex-start; gap: 0 16px; }
+  .brand, .top-right { height: 62px; }
+  .tabs { flex: 0 0 calc(100% + 32px); margin: 0 -16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #ffffff; }
+  .tabs a { min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--ink-2); text-decoration: none; }
   .tabs a[aria-current="true"] { color: var(--maroon); font-weight: 500; }
   .bubble { min-height: 60px; padding: 10px 14px; font-size: 14px; }
   .speech-text { min-height: 2.6em; }
@@ -636,8 +642,9 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 16px; }
   .contact-list { grid-template-columns: minmax(0, 1fr); }
   html { scroll-padding-top: calc(var(--header) + var(--strip-h) + 8px); }
-  .project { left: 0; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 5; padding: 12px 16px 16px; overflow-y: auto; }
-  .film { flex: none; height: 38vh; }
+  .project { left: 0; top: calc(var(--header) + var(--strip-h)); padding: 12px 16px 92px; overflow-y: auto; }
+  .project[data-guide-full="true"] { top: calc(var(--header) + var(--panel-h)); }
+  .film { flex: none; height: 30vh; min-height: 180px; }
   .project-head { flex-wrap: wrap; }
   .project-actions { width: 100%; justify-content: flex-end; }
   .project-story { grid-template-columns: minmax(0, 1fr); }

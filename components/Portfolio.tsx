@@ -98,9 +98,10 @@ function Speech({ text }: { text: string }) {
   );
 }
 
-function ProjectView({ project, visible, mediaRef, onClose, closeRef }: {
+function ProjectView({ project, visible, guideFull, mediaRef, onClose, closeRef }: {
   project: Project;
   visible: boolean;
+  guideFull: boolean;
   mediaRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   closeRef: React.RefObject<HTMLButtonElement | null>;
@@ -118,7 +119,7 @@ function ProjectView({ project, visible, mediaRef, onClose, closeRef }: {
   }, [paused, visible, project.shots.length]);
 
   return (
-    <section className="project" data-visible={visible} role="dialog" aria-label={project.title}>
+    <section className="project" data-visible={visible} data-guide-full={guideFull} role="dialog" aria-label={project.title}>
       <div className="film" ref={mediaRef}>
         {project.shots.map((s, i) => (
           <div key={i} className="shot" data-on={i === shot}>
@@ -192,6 +193,9 @@ export default function Portfolio() {
   const doorTimer = useRef(0);
   const compactRef = useRef(false);
   const guideOpenedAt = useRef(0);
+  // Focus is only moved for keyboard users. After a click or tap, pressing an arrow
+  // key would otherwise draw a focus ring around whatever was last pressed.
+  const usingPointer = useRef(true);
   useEffect(() => { openRef.current = open; }, [open]);
   useEffect(() => { compactRef.current = compact; }, [compact]);
   useEffect(() => { if (guideOpen) guideOpenedAt.current = window.scrollY; }, [guideOpen]);
@@ -226,20 +230,70 @@ export default function Portfolio() {
     const ro = new ResizeObserver(measure);
     ro.observe(document.body);
     const onMove = (e: PointerEvent) => avatar.pointerMove(e.clientX, e.clientY);
+    const onDown = (e: PointerEvent) => {
+      usingPointer.current = true;
+      // On a touch screen a tap is the only "cursor" he gets: look there, and walk over if it's on the stairs.
+      avatar.pointerMove(e.clientX, e.clientY);
+    };
+    const onUp = () => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.matches("button, a")) active.blur();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Tab" || e.key === "Enter" || e.key === " ") usingPointer.current = false;
+    };
+    // Touch only: he looks at what you're reading, and points out a project you stop on.
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    let pointTimer = 0;
+    let releaseTimer = 0;
+    let lastPointed: Element | null = null;
+    const attend = () => {
+      if (!coarse || openRef.current !== null) return;
+      const middle = window.innerHeight * 0.55;
+      let best: Element | null = null;
+      let bestGap = Infinity;
+      document.querySelectorAll(".tile, .content h1, .content h2, .content h3").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const gap = Math.abs(r.top + r.height / 2 - middle);
+        if (gap < bestGap) { bestGap = gap; best = el; }
+      });
+      if (!best) return;
+      const target: Element = best;
+      const r = target.getBoundingClientRect();
+      const center = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      avatar.setGaze(center);
+      window.clearTimeout(pointTimer);
+      pointTimer = window.setTimeout(() => {
+        if (!target.matches(".tile") || target === lastPointed || openRef.current !== null) return;
+        lastPointed = target;
+        avatar.hover(center);
+        window.clearTimeout(releaseTimer);
+        releaseTimer = window.setTimeout(() => avatar.hover(null), 1600);
+      }, 900);
+    };
     const onScroll = () => {
       const y = window.scrollY;
       const phone = window.innerWidth <= 980;
       setCompact((c) => (phone ? (c ? y > 8 : y > 48) : false));
       if (Math.abs(y - guideOpenedAt.current) > 60) setGuideOpen(false);
+      attend();
     };
     onScroll();
     window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onDown, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", measure);
     window.addEventListener("resize", onScroll);
     return () => {
       ro.disconnect();
+      window.clearTimeout(pointTimer);
+      window.clearTimeout(releaseTimer);
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", measure);
       window.removeEventListener("resize", onScroll);
@@ -259,7 +313,7 @@ export default function Portfolio() {
     setOpen(null);
     setViewVisible(false);
     if (!silent) say("Anything else catch your eye?");
-    returnFocus.current?.focus({ preventScroll: true });
+    if (!usingPointer.current) returnFocus.current?.focus({ preventScroll: true });
   }, [avatar, say]);
 
   const pickProject = useCallback((i: number, tile?: HTMLElement | null) => {
@@ -268,6 +322,8 @@ export default function Portfolio() {
     returnFocus.current = el;
     flight.current.from = el?.querySelector(".tile-media")?.getBoundingClientRect() ?? null;
     document.documentElement.classList.add("locked");
+    // On a phone he steps out of the strip, full size, to make the catch.
+    if (compactRef.current) setGuideOpen(true);
     avatar.beginCatch();
     setViewVisible(false);
     setOpen(i);
@@ -281,8 +337,10 @@ export default function Portfolio() {
     const finish = () => {
       if (flyer.current) flyer.current.style.display = "none";
       setViewVisible(true);
+      setGuideOpen(false);
       avatar.present();
-      say(project.summary);
+      setSpeech(project.summary);
+      avatar.talk(project.summary);
     };
     const from = flight.current.from;
     const box = flyer.current;
@@ -330,7 +388,7 @@ export default function Portfolio() {
 
   // The view is hidden until the flight lands, so focus can only move once it shows.
   useEffect(() => {
-    if (viewVisible) closeBtn.current?.focus({ preventScroll: true });
+    if (viewVisible && !usingPointer.current) closeBtn.current?.focus({ preventScroll: true });
   }, [viewVisible]);
 
   useEffect(() => {
@@ -345,6 +403,7 @@ export default function Portfolio() {
     window.clearTimeout(doorTimer.current);
     setDoorOpen(true);
     avatar.celebrate();
+    if (compactRef.current) setGuideOpen(true);
     try {
       await navigator.clipboard.writeText(portfolio.email);
       setCopied(true);
@@ -352,7 +411,7 @@ export default function Portfolio() {
     } catch {
       say(`I couldn't reach your clipboard, so here it is: ${portfolio.email}`);
     }
-    doorTimer.current = window.setTimeout(() => { setDoorOpen(false); setCopied(false); }, 3200);
+    doorTimer.current = window.setTimeout(() => { setDoorOpen(false); setCopied(false); setGuideOpen(false); }, 3200);
   }, [avatar, say]);
 
   const runAction = useCallback((action: Action) => {
@@ -419,6 +478,11 @@ export default function Portfolio() {
     setSpeech("Hi! I'm Sanyam. Your browser can't show my moving self, but everything is still here. Ask me anything.");
   }, []);
 
+  // In the phone's reading strip, tapping the little figure brings him back full size.
+  const onFigureTap = useCallback(() => {
+    if (compactRef.current) setGuideOpen(true);
+  }, []);
+
   const options = optionsFor(zone, open);
   const closeOnNav = () => { if (openRef.current !== null) closeProject(true); };
 
@@ -443,6 +507,11 @@ export default function Portfolio() {
             <DownloadIcon />Download résumé
           </a>
         </div>
+        <nav aria-label="Sections" className="tabs" onClick={closeOnNav}>
+          {SECTIONS.map((s) => (
+            <a key={s.id} href={`#${s.id}`} aria-current={zone === s.id ? "true" : undefined}>{s.label}</a>
+          ))}
+        </nav>
       </header>
 
       <div className="split">
@@ -623,17 +692,12 @@ export default function Portfolio() {
         </main>
       </div>
 
-      <nav aria-label="Sections" className="tabs" onClick={closeOnNav}>
-        {SECTIONS.map((s) => (
-          <a key={s.id} href={`#${s.id}`} aria-current={zone === s.id ? "true" : undefined}>{s.label}</a>
-        ))}
-      </nav>
-
       {open !== null && (
         <ProjectView
           key={open}
           project={portfolio.projects[open]}
           visible={viewVisible}
+          guideFull={viewVisible ? !(compact && !guideOpen) : !compact}
           mediaRef={media}
           closeRef={closeBtn}
           onClose={() => closeProject()}
@@ -644,7 +708,7 @@ export default function Portfolio() {
         {open !== null && <Still project={portfolio.projects[open]} image={portfolio.projects[open].image} />}
       </div>
 
-      <Stage avatar={avatar} slot={slot} bubble={bubble} signs={signs} zone={zone} doorOpen={doorOpen} onSign={onSign} onNoWebgl={onNoWebgl} />
+      <Stage avatar={avatar} slot={slot} bubble={bubble} signs={signs} zone={zone} doorOpen={doorOpen} onSign={onSign} onNoWebgl={onNoWebgl} onFigureTap={onFigureTap} />
     </div>
   );
 }

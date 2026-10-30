@@ -9,7 +9,7 @@ const hand = Shantell_Sans({ subsets: ["latin"], weight: ["500"], variable: "--f
 const description = `${portfolio.name}, ${portfolio.role.toLowerCase()}. Projects, experience, skills and résumé, with a soft guide in a maroon scarf who shows you around.`;
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? process.env.URL ?? "http://localhost:3000"),
   title: `${portfolio.name}, ${portfolio.role}`,
   description,
   openGraph: { title: `${portfolio.name}, ${portfolio.role}`, description, type: "website" },

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/midnight/.claude/skills/impeccable/scripts/impeccable context *)",
+      "Bash(/Users/midnight/.claude/skills/impeccable/scripts/impeccable concept-seed *)"
+    ]
+  }
+}

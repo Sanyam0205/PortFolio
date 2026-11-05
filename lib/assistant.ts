@@ -30,6 +30,13 @@ export function answer(question: string, openProject: number | null): Reply {
   const named = portfolio.projects.findIndex((p) => q.includes(p.title.toLowerCase()));
   if (named >= 0) return { say: `${portfolio.projects[named].title}, coming up.`, action: { open: named } };
 
+  // A project's own questions: the offered button's exact wording first.
+  const asked = current?.questions.find((x) => x.label.toLowerCase() === q);
+  if (asked) return { say: asked.answer };
+  if (current && has(/source|\bcode\b|github|repo/)) {
+    return { say: current.sourceUrl ? `The code is on GitHub: press Source, or go to ${current.sourceUrl.replace("https://", "")}.` : "The code for this one isn't public yet." };
+  }
+
   if (has(/how (are|were) you (built|made)|how.*(figure|character).*(built|made)|are you (real|a model|3d)|shader/)) {
     return { say: "No 3D model or video. I'm drawn by a hand-written shader on every frame, and my walk and scarf are plain TypeScript." };
   }
@@ -46,12 +53,20 @@ export function answer(question: string, openProject: number | null): Reply {
   }
 
   if (has(/hard|challeng|difficult|tough/)) {
-    return { say: current ? current.hard : "Pick a project first and I'll tell you what was hard about it." };
+    if (!current) return { say: "Pick a project first and I'll tell you what was hard about it." };
+    return { say: current.hard ?? "I haven't written that up for this one yet. Ask me what it does or what it's built with." };
   }
+  // Typed questions that match one of the open project's own questions.
+  const typed = current?.questions.find((x) => x.keys.some((k) => q.includes(k)));
+  if (typed) return { say: typed.answer };
   if (current && has(/stack|\buse\b|built with|tech|tools/)) return { say: `I built it with ${current.skills.join(", ")}.` };
   if (current && has(/result|turn out|turned out|impact|learn|outcome|status|stand/)) return { say: current.status };
   if (current && has(/what is|what does|about this/)) return { say: current.summary };
 
+  if (has(/what do you do|currently|right now|day job|working on|current (job|role)/)) {
+    const [now] = portfolio.experience;
+    return { say: `I'm a ${now.title} at ${now.where}: ${now.note.charAt(0).toLowerCase()}${now.note.slice(1)}`, action: "experience" };
+  }
   if (has(/resume|résumé|\bcv\b/)) return { say: "The résumé button is always in the top right corner. It's the maroon one." };
   if (has(/experience|worked at|\bjob|company|employ/)) {
     const [latest] = portfolio.experience;

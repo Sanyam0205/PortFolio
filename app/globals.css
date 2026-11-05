@@ -443,6 +443,10 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
 .still-empty small { font-size: 12px; }
 .still-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .shot .still-img { object-fit: contain; }
+/* Tiles crop screenshots to 4:3; keep the app's top-left (nav and headings) in frame. */
+.tile-media .still-img { object-position: left top; }
+/* A recording keeps still: the drift would crop its edges as it plays. */
+.shot[data-video="true"][data-on="true"] { animation: none; }
 
 .experience-section { padding: 64px 0 96px; display: flex; flex-direction: column; gap: 16px; }
 .experience-section h2 { font-size: 56px; line-height: 1; letter-spacing: -0.035em; margin-bottom: 16px; }
@@ -528,12 +532,18 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   visibility: hidden;
 }
 .project[data-visible="true"] { visibility: visible; }
+/* The film keeps the recordings' 16:10 shape, capped so the title and summary stay in view. */
 .film {
   position: relative;
-  flex: 1;
+  flex: none;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 52vh;
   min-height: 200px;
   border-radius: 22px;
   overflow: hidden;
@@ -545,29 +555,69 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   from { transform: scale(1.02); }
   to { transform: scale(1.04) translate(-0.8%, -0.5%); }
 }
-.film-caption { position: absolute; left: 14px; bottom: 14px; padding: 4px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.92); font-size: 14px; color: var(--ink-2); }
-.film-toggle {
-  position: absolute;
-  right: 12px;
-  bottom: 8px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  font: inherit;
-  font-size: 14px;
-  color: var(--ink-2);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 4px;
+.film-caption { position: absolute; left: 14px; top: 14px; max-width: calc(100% - 28px); margin: 0; padding: 4px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.92); font-size: 14px; color: var(--ink-2); }
+/* Player controls: play/pause, a seek bar with time for videos, and one dot per slide. */
+.film-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: -10px;
 }
+/* No recording yet: a shorter placeholder, so the text below comes up. */
+.film:has(.film-empty) { aspect-ratio: 16 / 6; }
+.film-play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.film-play:hover { background: var(--tint); }
+.film-seek {
+  --pct: 0%;
+  flex: 1;
+  min-width: 60px;
+  height: 24px;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.film-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--maroon) var(--pct), #d6d8de var(--pct)); }
+.film-seek::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; border: 2px solid #ffffff; border-radius: 50%; background: var(--maroon); box-shadow: 0 0 0 1px rgba(107, 15, 26, 0.25); -webkit-appearance: none; appearance: none; }
+.film-seek::-moz-range-track { height: 4px; border-radius: 2px; background: #d6d8de; }
+.film-seek::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--maroon); }
+.film-seek::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid #ffffff; border-radius: 50%; background: var(--maroon); }
+.film-seek:focus-visible { outline: 2px solid var(--maroon); outline-offset: 2px; border-radius: 4px; }
+.film-time { flex: none; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.film-dots { flex: none; display: flex; margin-left: auto; }
+.film-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.film-dot::before { content: ""; width: 7px; height: 7px; border-radius: 4px; background: #c4c7ce; transition: width 0.25s var(--ease-out), background 0.2s; }
+.film-dot:hover::before { background: var(--muted); }
+.film-dot[aria-current="true"]::before { width: 16px; background: var(--maroon); }
+.project-lead { max-width: 46em; font-size: 18px; line-height: 1.45; color: var(--ink); letter-spacing: -0.005em; }
 .project-head { display: flex; justify-content: space-between; align-items: end; gap: 12px 24px; }
 .project-head > div:first-child { flex: 1; min-width: 0; }
 .project-actions { flex: none; }
 .project-head h2 { font-size: 34px; line-height: 1.05; letter-spacing: -0.025em; }
 .project-meta { margin-top: 2px; font-size: 15px; color: var(--muted); }
-.project-story { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }
+.project-story { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; padding-top: 16px; border-top: 1px solid var(--line); }
 .project-story dt { font-size: 13px; color: var(--muted); }
 .project-story dd { margin-top: 2px; font-size: 15px; color: var(--ink-2); }
 .project-actions { display: flex; gap: 20px; align-items: center; font-size: 15px; }
@@ -660,7 +710,10 @@ h1, h2 { text-wrap: balance; font-weight: 500; }
   html { scroll-padding-top: calc(var(--header) + var(--strip-h) + 8px); }
   .project { left: 0; top: calc(var(--header) + var(--strip-h)); padding: 12px 16px 92px; overflow-y: auto; }
   .project[data-guide-full="true"] { top: calc(var(--header) + var(--panel-h)); }
-  .film { flex: none; height: 30vh; min-height: 180px; }
+  .film { max-height: none; min-height: 0; }
+  .film-caption { font-size: 13px; }
+  .film-time { display: none; }
+  .project-lead { font-size: 16px; }
   .project-head { flex-wrap: wrap; }
   .project-actions { width: 100%; justify-content: flex-end; }
   .project-story { grid-template-columns: minmax(0, 1fr); }

@@ -19,13 +19,19 @@ const projectSkills = new Set(portfolio.projects.flatMap((p) => p.skills));
 
 type Option = { label: string; ask?: string; action?: Action };
 
-function optionsFor(zone: Zone, open: number | null): Option[] {
+// While a project is open he offers its own questions first, three at a time; each one
+// asked makes way for the next, and the list starts over once they've all been asked.
+function optionsFor(zone: Zone, open: number | null, asked: string[]): Option[] {
   if (open !== null) {
-    return [
-      { label: "What was hard?", ask: "what was hard" },
+    const project = portfolio.projects[open];
+    const pool: Option[] = [
+      ...project.questions.map((x) => ({ label: x.label, ask: x.label })),
+      ...(project.hard ? [{ label: "What was hard?", ask: "what was hard" }] : []),
       { label: "What did you use?", ask: "what stack" },
       { label: "Where does it stand?", ask: "where does it stand" },
     ];
+    const fresh = pool.filter((o) => !asked.includes(o.label));
+    return (fresh.length ? fresh : pool).slice(0, 3);
   }
   if (zone === "work") {
     return [
@@ -50,6 +56,7 @@ function optionsFor(zone: Zone, open: number | null): Option[] {
   return [
     { label: "Show me your work", action: "work" },
     { label: "Who are you?", ask: "who are you" },
+    { label: "What do you do now?", ask: "what do you do now" },
     { label: "How do I reach you?", action: "contact" },
   ];
 }
@@ -57,7 +64,7 @@ function optionsFor(zone: Zone, open: number | null): Option[] {
 function Still({ project, image }: { project: Project; image?: string }) {
   if (image) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img className="still-img" src={image} alt="" />;
+    return <img className="still-img" src={image} alt="" loading="lazy" decoding="async" />;
   }
   return (
     <span className="still-empty">
@@ -112,18 +119,73 @@ function ProjectView({ project, visible, guideFull, mediaRef, onClose, closeRef 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPaused(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
+  // A video the browser can't play shows its poster and is timed like a still.
+  const [failed, setFailed] = useState<number[]>([]);
+  const count = project.shots.length;
+  const onVideo = Boolean(project.shots[shot]?.video) && !failed.includes(shot);
+  // Stills advance on a timer; a video advances when it ends.
   useEffect(() => {
-    if (paused || !visible || project.shots.length < 2) return;
-    const id = window.setInterval(() => setShot((s) => (s + 1) % project.shots.length), 3400);
-    return () => window.clearInterval(id);
-  }, [paused, visible, project.shots.length]);
+    if (paused || !visible || count < 2 || onVideo) return;
+    const id = window.setTimeout(() => setShot((s) => (s + 1) % count), 3400);
+    return () => window.clearTimeout(id);
+  }, [paused, visible, count, onVideo, shot]);
+  // Only the video on screen plays; the others rewind so they start fresh next time.
+  useEffect(() => {
+    mediaRef.current?.querySelectorAll<HTMLVideoElement>("video").forEach((v) => {
+      if (Number(v.dataset.shot) !== shot) {
+        v.pause();
+        v.currentTime = 0;
+      } else if (visible && !paused) {
+        // Autoplay refused: wait for Play. Any other failure is handled by onError.
+        v.play().catch((e: DOMException) => { if (e.name === "NotAllowedError") setPaused(true); });
+      } else {
+        v.pause();
+      }
+    });
+  }, [shot, visible, paused, mediaRef]);
+  // The progress bar follows the video on screen.
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  useEffect(() => {
+    const v = onVideo ? mediaRef.current?.querySelector<HTMLVideoElement>(`video[data-shot="${shot}"]`) : null;
+    if (!v) return;
+    const sync = () => {
+      setTime(v.currentTime);
+      if (Number.isFinite(v.duration)) setDuration(v.duration);
+    };
+    let frame = 0;
+    const tick = () => { sync(); frame = requestAnimationFrame(tick); };
+    tick();
+    v.addEventListener("loadedmetadata", sync);
+    return () => { cancelAnimationFrame(frame); v.removeEventListener("loadedmetadata", sync); };
+  }, [onVideo, shot, mediaRef]);
+  const seek = (t: number) => {
+    const v = mediaRef.current?.querySelector<HTMLVideoElement>(`video[data-shot="${shot}"]`);
+    if (v) v.currentTime = t;
+    setTime(t);
+  };
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
   return (
     <section className="project" data-visible={visible} data-guide-full={guideFull} role="dialog" aria-label={project.title}>
       <div className="film" ref={mediaRef}>
         {project.shots.map((s, i) => (
-          <div key={i} className="shot" data-on={i === shot}>
-            {s.image ? (
+          <div key={i} className="shot" data-on={i === shot} data-video={Boolean(s.video)}>
+            {s.video ? (
+              <video
+                className="still-img"
+                data-shot={i}
+                src={s.video}
+                poster={s.image}
+                muted
+                playsInline
+                loop={count === 1}
+                preload={i === 0 ? "auto" : "metadata"}
+                aria-label={s.alt}
+                onEnded={() => setShot((c) => (c + 1) % count)}
+                onError={() => setFailed((f) => (f.includes(i) ? f : [...f, i]))}
+              />
+            ) : s.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img className="still-img" src={s.image} alt={s.alt} />
             ) : (
@@ -133,17 +195,52 @@ function ProjectView({ project, visible, guideFull, mediaRef, onClose, closeRef 
         ))}
         {project.shots.length === 0 && (
           <div className="film-empty">
-            <p>{project.summary}</p>
+            <p>{project.title}</p>
             <small>Screenshots and a video are coming soon.</small>
           </div>
         )}
-        {project.shots.length > 0 && <p className="film-caption">{project.shots[shot].caption}</p>}
-        {project.shots.length > 1 && (
-          <button type="button" className="film-toggle" onClick={() => setPaused((p) => !p)}>
-            {paused ? "Play" : "Pause"}
-          </button>
-        )}
+        {count > 0 && <p className="film-caption">{project.shots[shot].caption}</p>}
       </div>
+      {(count > 1 || onVideo) && (
+        <div className="film-bar">
+          <button type="button" className="film-play" aria-label={paused ? "Play" : "Pause"} onClick={() => setPaused((p) => !p)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              {paused ? <path d="M3 1.5v11l9.5-5.5z" fill="currentColor" /> : <path d="M3 1.5h3v11H3zM8 1.5h3v11H8z" fill="currentColor" />}
+            </svg>
+          </button>
+          {onVideo && (
+            <>
+              <input
+                type="range"
+                className="film-seek"
+                aria-label="Seek video"
+                aria-valuetext={`${clock(time)} of ${clock(duration)}`}
+                min={0}
+                max={duration || 1}
+                step={0.1}
+                value={Math.min(time, duration || 1)}
+                style={{ "--pct": `${duration ? (time / duration) * 100 : 0}%` } as CSSProperties}
+                onChange={(e) => seek(Number(e.currentTarget.value))}
+              />
+              <span className="film-time">{clock(time)} / {clock(duration)}</span>
+            </>
+          )}
+          {count > 1 && (
+            <span className="film-dots">
+              {project.shots.map((s, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="film-dot"
+                  aria-label={`${s.video ? "Video" : "Screenshot"} ${i + 1} of ${count}: ${s.caption}`}
+                  aria-current={i === shot ? "true" : undefined}
+                  onClick={() => setShot(i)}
+                />
+              ))}
+            </span>
+          )}
+        </div>
+      )}
       <div className="project-head">
         <div>
           <h2>{project.title}</h2>
@@ -155,9 +252,11 @@ function ProjectView({ project, visible, guideFull, mediaRef, onClose, closeRef 
           <button ref={closeRef} type="button" className="close" onClick={onClose}>Close</button>
         </div>
       </div>
+      <p className="project-lead">{project.summary}</p>
       <dl className="project-story">
         <div><dt>The problem</dt><dd>{project.problem}</dd></div>
         <div><dt>What I built</dt><dd>{project.built}</dd></div>
+        {project.hard && <div><dt>The hard part</dt><dd>{project.hard}</dd></div>}
         <div><dt>Where it stands</dt><dd>{project.status}</dd></div>
       </dl>
     </section>
@@ -510,7 +609,15 @@ export default function Portfolio() {
     if (compactRef.current) setGuideOpen(true);
   }, []);
 
-  const options = optionsFor(zone, open);
+  // Questions already asked about the project that's open; another project starts fresh.
+  const [asked, setAsked] = useState<{ project: number | null; labels: string[] }>({ project: null, labels: [] });
+  const askedHere = asked.project === open ? asked.labels : [];
+  const options = optionsFor(zone, open, askedHere);
+  const choose = (o: Option) => {
+    if (o.action) { runAction(o.action); return; }
+    if (open !== null) setAsked({ project: open, labels: [...askedHere, o.label] });
+    respond(o.ask ?? "");
+  };
   const closeOnNav = () => { if (openRef.current !== null) closeProject(true); };
 
   return (
@@ -554,7 +661,7 @@ export default function Portfolio() {
                   key={o.label}
                   type="button"
                   className="option"
-                  onClick={() => (o.action ? runAction(o.action) : respond(o.ask ?? ""))}
+                  onClick={() => choose(o)}
                 >
                   {o.label}
                 </button>

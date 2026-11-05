@@ -62,7 +62,7 @@ public/               Résumé PDF
 
 Everything lives in [content/portfolio.ts](content/portfolio.ts). The page and the figure's answers both read from it.
 
-- **Projects:** the first one gets the large "Start here" tile. Set `liveUrl`, `sourceUrl`, `image` and `shots` as they become available, and they appear on their own.
+- **Projects:** the first one gets the large "Start here" tile. Set `liveUrl`, `sourceUrl`, `image` and `shots` as they become available, and they appear on their own. A shot with a `video` plays through before the stills, using its `image` as the poster. Media lives in `public/projects/`. Each project's `questions` are what the figure offers while it's open (three at a time), and typed questions containing one of a question's `keys` get its answer.
 - **Skills:** a project's `skills` must use the same names as `skillGroups`, or clicking a skill won't find it.
 - **Contact:** a LinkedIn or GitHub row stays hidden until its `href` is set.
 - **Résumé:** replace `public/Sanyam_Singh_Resume.pdf`, and keep `resumeUrl` as `/Sanyam_Singh_Resume.pdf`.
@@ -80,4 +80,4 @@ Netlify provides the site's address to the build, which the share preview uses. 
 
 ## Status
 
-The site is live. Screenshots, videos and links for the projects are still to come, and there are no automated tests yet.
+The site is live. breakAPI and GiggleGig have screenshots, a walkthrough video and links; the Academic Publication Profiler's are still to come. There are no automated tests yet.

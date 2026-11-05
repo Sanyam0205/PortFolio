@@ -53,7 +53,7 @@ export const portfolio = {
     { label: "Currently", value: "Software Development Engineer I, Teleperformance" },
     { label: "Focus", value: "Python backend, automation, LLM integration" },
     { label: "Based in", value: "India" },
-    { label: "Education", value: "B.Tech in IT, Amity University. CGPA 8.04/10" },
+    { label: "Education", value: "B.Tech in IT, Amity University. CGPA 8.15/10" },
   ],
   skillGroups,
   skills: "Python, FastAPI, Node.js, SQL and MongoDB, plus LLM integration with Ollama and vector search",
@@ -79,7 +79,7 @@ export const portfolio = {
   ],
   education: [
     { title: "Major Certification in Artificial Intelligence", where: "Indian Institute of Technology Ropar", when: "Nov 2024 – Jun 2026" },
-    { title: "B.Tech in Information Technology", where: "Amity University, CGPA 8.04/10", when: "2021 – 2025" },
+    { title: "B.Tech in Information Technology", where: "Amity University, CGPA 8.15/10", when: "2021 – 2025" },
   ],
   certifications: [
     "NPTEL: Introduction to Machine Learning",
